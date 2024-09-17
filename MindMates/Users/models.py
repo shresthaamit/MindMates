@@ -18,3 +18,7 @@ USER_PROFILE_IMAGE_PATH = GenerateProfileImagePath()
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     profile_picture = models.FileField(upload_to=USER_PROFILE_IMAGE_PATH, blank=True, null=True)
+    
+    
+    def __str__(self):
+        return self.user.username
