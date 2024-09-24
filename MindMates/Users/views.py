@@ -8,5 +8,3 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
 
-def hello():
-    print("Hello!")
