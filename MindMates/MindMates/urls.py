@@ -18,8 +18,11 @@ from django.contrib import admin
 from django.urls import path,include
 from Users import routers as users_urls
 from django.conf import settings
+from django.urls import reverse
+# from rest_framework_social_oauth2 import urls as social_oauth2_urls
 auth_api_urls=[
     path('auth/', include('rest_framework_social_oauth2.urls'))
+    
 ]
 if settings.DEBUG:
     auth_api_urls.append(path('verify/',include('rest_framework.urls')))
