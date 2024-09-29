@@ -96,7 +96,7 @@ REST_FRAMEWORK = {
 }
 AUTHENTICATION_BACKENDS = (
 
-   'rest_framework_social_oauth2.backends.DjangoOAuth2',
+#    'rest_framework_social_oauth2.backends.DjangoOAuth2',
    'django.contrib.auth.backends.ModelBackend',
 )
 # Password validation
@@ -116,7 +116,16 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
-
+# OAUTH2_PROVIDER = {
+#     'ACCESS_TOKEN_EXPIRE_SECONDS': 36000,
+#     'AUTHORIZATION_CODE_EXPIRE_SECONDS': 36000,
+#     'APPLICATION_MODEL': 'oauth2_provider.Application',
+#     'REFRESH_TOKEN_EXPIRE_SECONDS': 864000,
+#     'SCOPES': {
+#         'read': 'Read scope',
+#         'write': 'Write scope',
+#     }
+# }
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/

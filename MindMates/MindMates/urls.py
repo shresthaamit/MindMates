@@ -1,33 +1,21 @@
 """
 URL configuration for MindMates project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/4.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
-from django.urls import path,include
+from django.urls import path, include
 from Users import routers as users_urls
 from django.conf import settings
-from django.urls import reverse
-# from rest_framework_social_oauth2 import urls as social_oauth2_urls
-auth_api_urls=[
-    path('auth/', include('rest_framework_social_oauth2.urls'))
-    
+
+auth_api_urls = [
+    path('auth/', include('oauth2_provider.urls', namespace='oauth2_provider')),  # OAuth2 provider URLs
 ]
+
 if settings.DEBUG:
-    auth_api_urls.append(path('verify/',include('rest_framework.urls')))
+    auth_api_urls.append(path('verify/', include('rest_framework.urls')))  # Debug verification URLs
+
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("accounts/",include(users_urls.router.urls)),
-    *auth_api_urls
+    path("accounts/", include(users_urls.router.urls)),  # Custom user accounts API
+    *auth_api_urls,  # OAuth2 URLs
 ]
