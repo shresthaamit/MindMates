@@ -2,10 +2,10 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True,required=False)
     old_password = serializers.CharField(write_only=True, required=False)
     username = serializers.CharField(read_only=True)
-    def update(self,data):
+    def validate(self,data):
         request_method = self.context['request'].method
         password  = data.get('password',None)
         if request_method == 'POST':
@@ -26,13 +26,14 @@ class UserSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         try:
             user = instance
-            password = validated_data.pop("password")
-            old_password = validated_data.pop("old_password")
-            if user.check_password(old_password):
-                user.set_password(password)
-                
-            else:
-                raise Exception("Old password is invalid")
+            if 'password' in validated_data:
+                password = validated_data.pop("password")
+                old_password = validated_data.pop("old_password")
+                if user.check_password(old_password):
+                    user.set_password(password)
+                    
+                else:
+                    raise Exception("Old password is invalid")
             user.save()
         except Exception as err:
             raise serializers.ValidationError({"info":err})
