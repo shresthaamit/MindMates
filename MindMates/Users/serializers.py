@@ -1,10 +1,20 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
+from .models import UserProfile
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    user = serializers.HyperlinkedRelatedField(read_only=True,many=False,view_name="user-detail")
+    class Meta:
+        model = UserProfile
+        fields = ['url',  'id', 'user', 'profile_picture' ]
+
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True,required=False)
     old_password = serializers.CharField(write_only=True, required=False)
     username = serializers.CharField(read_only=True)
+    profile = UserProfileSerializer(source='userprofile', read_only=False)
+    # profile = UserProfileSerializer(read_only= False)
     def validate(self,data):
         request_method = self.context['request'].method
         password  = data.get('password',None)
@@ -41,4 +51,4 @@ class UserSerializer(serializers.ModelSerializer):
         return super(UserSerializer,self).update(instance,validated_data)
     class Meta:
         model = User
-        fields = ['url','id','username','email','first_name','last_name','password','old_password']
+        fields = ['url','id','username','email','first_name','last_name','password','old_password','profile']
