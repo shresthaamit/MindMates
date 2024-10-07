@@ -5,6 +5,7 @@ URL configuration for MindMates project.
 from django.contrib import admin
 from django.urls import path, include
 from Users import routers as users_urls
+from QueryMate import routers as querymate_urls
 from django.conf import settings
 
 auth_api_urls = [
@@ -16,6 +17,7 @@ if settings.DEBUG:
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("accounts/", include(users_urls.router.urls)),  
+    path("accounts/", include(users_urls.router.urls)), 
+    path("querymate/", include(querymate_urls.router.urls)),  # QueryMate URLs
     *auth_api_urls,  # OAuth2 URLs
 ]
