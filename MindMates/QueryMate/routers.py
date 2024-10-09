@@ -4,3 +4,4 @@ app_name = "queryMate"
 router = routers.DefaultRouter()
 router.register("tags", TagViewset, basename="tags")
 router.register("questions", QuestionViewset, basename="questions")
+

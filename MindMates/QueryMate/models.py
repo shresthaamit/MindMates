@@ -19,6 +19,8 @@ class Question(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     upvotes = models.ManyToManyField(User, related_name='upvoted_questions', blank=True)
     downvotes = models.ManyToManyField(User, related_name='downvoted_questions', blank=True)
+    upvote_count = models.PositiveIntegerField(default=0)  # Upvote count
+    downvote_count = models.PositiveIntegerField(default=0)
     
     class Meta:
         ordering = ['-created_at']
@@ -26,5 +28,32 @@ class Question(models.Model):
     def __str__(self):
         return self.title
     
-    
-    
+    def toggle_upvote(self, user):
+        if user in self.upvotes.all():
+            self.upvotes.remove(user)
+            self.upvote_count -= 1
+            message = 'Upvote removed'
+        else:
+            if user in self.downvotes.all():
+                self.downvotes.remove(user)
+                self.downvote_count -= 1
+            self.upvotes.add(user)
+            self.upvote_count += 1
+            message = 'Question upvoted'
+        self.save()
+        return message
+
+    def toggle_downvote(self, user):
+        if user in self.downvotes.all():
+            self.downvotes.remove(user)
+            self.downvote_count -= 1
+            message = 'Downvote removed'
+        else:
+            if user in self.upvotes.all():
+                self.upvotes.remove(user)
+                self.upvote_count -= 1
+            self.downvotes.add(user)
+            self.downvote_count += 1
+            message = 'Question downvoted'
+        self.save()
+        return message
