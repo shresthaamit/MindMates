@@ -57,7 +57,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         model = Question
         fields = [
             'id', 'title', 'description', 'image', 'user', 
-            'created_at', 'updated_at', 'tags', 'tag_ids'
+            'created_at', 'updated_at', 'tags', 'tag_ids','upvote_count','downvote_count'
         ]
         read_only_fields = ['user', 'created_at', 'updated_at']
 

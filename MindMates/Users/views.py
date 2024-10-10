@@ -10,7 +10,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-class UserProfileViewSet(viewsets.GenericViewSet,mixins.RetrieveModelMixin,mixins.UpdateModelMixin,mixins.ListModelMixin):
+class UserProfileViewSet(viewsets.GenericViewSet,mixins.RetrieveModelMixin,mixins.UpdateModelMixin):
     permission_classes =[IsProfileUserOrReadOnly]
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer

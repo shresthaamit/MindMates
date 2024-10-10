@@ -57,3 +57,29 @@ class Question(models.Model):
             message = 'Question downvoted'
         self.save()
         return message
+    
+    
+class Answer(models.Model):
+    image  =  models.ImageField(upload_to='answers/images/', blank=True, null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='answer')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='qanswer')
+    answerurl =  models.URLField(blank=True, null=True)
+    detail = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    upvotes = models.ManyToManyField(User, related_name='upvoted_answers', blank=True)
+    downvotes = models.ManyToManyField(User, related_name='downvoted_answers', blank=True)
+    
+    def __str__(self):
+        return f"Answer by {self.user} on {self.question}"
+
+    def add_upvote(self, user):
+        if user in self.downvotes.all():
+            self.downvotes.remove(user)
+        self.upvotes.add(user)
+
+    def add_downvote(self, user):
+        if user in self.upvotes.all():
+            self.upvotes.remove(user)
+        self.downvotes.add(user)
+    
