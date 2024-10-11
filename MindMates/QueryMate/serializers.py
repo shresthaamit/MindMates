@@ -41,7 +41,7 @@
 #             question.tags.set(tags)  # Use .set() for many-to-many relationship
 #         return question
 from rest_framework import serializers
-from .models import Tag, Question
+from .models import Tag, Question,Answer
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -54,6 +54,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
 
     class Meta:
+        
         model = Question
         fields = [
             'id', 'title', 'description', 'image', 'user', 
@@ -69,3 +70,23 @@ class QuestionSerializer(serializers.ModelSerializer):
 
 class VoteSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=['upvote', 'downvote'])
+
+
+class AnswerSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField(read_only=True)
+    class Meta:
+        model = Answer
+        fields = ['id', 'user', 'content', 'created_at', 'updated_at']
+        read_only_fields = ['user', 'created_at', 'updated_at']
+        
+        
+    def validate(self, data):
+        user =  self.context['request'].user
+        question = data.get('question')
+        if Answer.objects.filter(user=user,question=question).exists():
+            raise serializers.ValidationError('You have already answered this question')
+        return data
+    
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
