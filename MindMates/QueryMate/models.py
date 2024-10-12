@@ -62,7 +62,7 @@ class Question(models.Model):
 class Answer(models.Model):
     image  =  models.ImageField(upload_to='answers/images/', blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='answer')
-    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='qanswer')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
     answerurl =  models.URLField(blank=True, null=True)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)

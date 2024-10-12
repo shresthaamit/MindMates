@@ -37,7 +37,7 @@ from .models import Tag, Question,Answer
 from .serializers import TagSerializer, QuestionSerializer, VoteSerializer,AnswerSerializer
 from .permissions import IsAuthenticated, IsOwner,IsAdminOrStaffOtherReadOnly
 from rest_framework.authentication import SessionAuthentication
-
+from rest_framework.exceptions import NotFound
 
 
 class TagViewset(viewsets.ModelViewSet):
@@ -78,6 +78,7 @@ class AnswerViewset(viewsets.ModelViewSet):
     queryset = Answer.objects.all()
     serializer_class = AnswerSerializer
     permission_classes = [permissions.AllowAny]
+    # lookup_field = 'id'
     
     def get_permissions(self):
         if self.action == 'create':
@@ -88,10 +89,15 @@ class AnswerViewset(viewsets.ModelViewSet):
     
     
     def get_queryset(self):
-        question_id = self.kwargs.get('question_id')
+        question_id = self.kwargs.get('question_pk')
         if question_id:
             return self.queryset.filter(question_id = question_id)
         return self.queryset
     
     def perform_create(self, serializer):
-        return serializer.save(user = self.request.user)
+        question_id = self.kwargs.get('question_pk')
+        try:
+            question = Question.objects.get(id=question_id)
+        except Question.DoesNotExist:
+            raise NotFound("Question not found.")
+        serializer.save(user=self.request.user, question=question)
