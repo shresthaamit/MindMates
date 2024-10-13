@@ -30,6 +30,7 @@
 #         question = self.get_object()
 #         question.downvotes.add(request.user)  # Use .add() for many-to-many
 #         return Response({'status': 'question downvoted'})
+from django.forms import ValidationError
 from rest_framework import viewsets, status,permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -93,11 +94,30 @@ class AnswerViewset(viewsets.ModelViewSet):
         if question_id:
             return self.queryset.filter(question_id = question_id)
         return self.queryset
-    
     def perform_create(self, serializer):
         question_id = self.kwargs.get('question_pk')
         try:
             question = Question.objects.get(id=question_id)
         except Question.DoesNotExist:
             raise NotFound("Question not found.")
+        existing_answer = Answer.objects.filter(user=self.request.user, question=question).first()
+        if existing_answer:
+        # Update the existing answer
+            serializer = self.get_serializer(existing_answer, data=serializer.validated_data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
         serializer.save(user=self.request.user, question=question)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    # def perform_create(self, serializer):
+    #     question_id = self.kwargs.get('question_pk')
+    #     try:
+    #         question = Question.objects.get(id=question_id)
+    #     except Question.DoesNotExist:
+    #         raise NotFound("Question not found.")
+    #     if Answer.objects.filter(user=self.request.user, question=question).exists():
+    #         return Response({"detail": "You have already answered this question."}, status=status.HTTP_400_BAD_REQUEST)
+    #         # raise ValidationError("You have already answered this question.")
+    #     serializer.save(user=self.request.user, question=question)
+    #     return Response(serializer.data, status=status.HTTP_201_CREATED)

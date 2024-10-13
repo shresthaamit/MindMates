@@ -18,6 +18,6 @@ if settings.DEBUG:
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include(users_urls.router.urls)), 
-    path("querymate/", include(querymate_urls.router.urls)),  # QueryMate URLs
+    path("querymate/", include("QueryMate.urls")),  # QueryMate URLs
     *auth_api_urls,  # OAuth2 URLs
 ]
