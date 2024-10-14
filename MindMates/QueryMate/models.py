@@ -85,3 +85,16 @@ class Answer(models.Model):
             self.upvotes.remove(user)
         self.downvotes.add(user)
     
+
+class Review(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
+    answer = models.ForeignKey(Answer, on_delete=models.CASCADE, related_name='review_answers')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True)
+    
+    # class Meta:
+    def __str__(self):
+        return f"Review by {self.user} on {self.answer}"
+        

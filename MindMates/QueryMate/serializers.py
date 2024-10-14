@@ -41,20 +41,25 @@
 #             question.tags.set(tags)  # Use .set() for many-to-many relationship
 #         return question
 from rest_framework import serializers
-from .models import Tag, Question,Answer
+from .models import Tag, Question,Answer,Review
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ('id', 'name')
 
+class ReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = "__all__"
 
 
 class AnswerSerializer(serializers.ModelSerializer):
+    review_answers = ReviewSerializer(many=True, read_only=True)
     user = serializers.StringRelatedField(read_only=True)
     class Meta:
         model = Answer
-        fields = ['id', 'user', 'content', 'created_at', 'updated_at']
+        fields = ['id', 'user', 'content', 'created_at', 'updated_at','review_answers']
         read_only_fields = ['user', 'created_at', 'updated_at']
         
         

@@ -35,11 +35,11 @@ from rest_framework import viewsets, status,permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import Tag, Question,Answer
-from .serializers import TagSerializer, QuestionSerializer, VoteSerializer,AnswerSerializer
+from .serializers import TagSerializer, QuestionSerializer, VoteSerializer,AnswerSerializer,ReviewSerializer
 from .permissions import IsAuthenticated, IsOwner,IsAdminOrStaffOtherReadOnly
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import NotFound
-
+from rest_framework import generics
 
 class TagViewset(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
@@ -121,3 +121,11 @@ class AnswerViewset(viewsets.ModelViewSet):
     #         # raise ValidationError("You have already answered this question.")
     #     serializer.save(user=self.request.user, question=question)
     #     return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+class ReviewCreate(generics.CreateAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    def perform_create(self, serializer):
+        pk = self.kwargs.get('pk')
+        answer = Answer.objects.get(pk=pk)
+        serializer.save(answer=answer, user=self.request.user)

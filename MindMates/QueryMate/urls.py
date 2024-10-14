@@ -18,7 +18,7 @@
 from rest_framework import routers
 from django.urls import path, include
 from rest_framework_nested.routers import NestedSimpleRouter
-from .views import TagViewset, QuestionViewset, AnswerViewset
+from .views import TagViewset, QuestionViewset, AnswerViewset,ReviewCreate
 
 # Main router
 from django.urls import path, include
@@ -38,4 +38,6 @@ questions_router.register('answers', AnswerViewset, basename='question-answers')
 urlpatterns = [
     path('', include(router.urls)),
     path('', include(questions_router.urls)),
+    path('answers/<int:pk>/review/',ReviewCreate.as_view(), name='review-create'),
+    
 ]

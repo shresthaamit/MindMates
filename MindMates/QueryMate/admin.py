@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Tag, Question,Answer
+from .models import Tag, Question,Answer,Review
 # Register your models here.
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
@@ -12,3 +12,4 @@ class TagAdmin(admin.ModelAdmin):
     list_display = ('name',)
     
 admin.site.register(Answer)
+admin.site.register(Review)
