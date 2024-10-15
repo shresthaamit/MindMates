@@ -34,7 +34,7 @@ from django.forms import ValidationError
 from rest_framework import viewsets, status,permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import Tag, Question,Answer
+from .models import Tag, Question,Answer,Review
 from .serializers import TagSerializer, QuestionSerializer, VoteSerializer,AnswerSerializer,ReviewSerializer
 from .permissions import IsAuthenticated, IsOwner,IsAdminOrStaffOtherReadOnly
 from rest_framework.authentication import SessionAuthentication
@@ -141,3 +141,16 @@ class ReviewCreate(generics.CreateAPIView):
         pk = self.kwargs.get('pk')
         answer = Answer.objects.get(pk=pk)
         serializer.save(answer=answer, user=self.request.user)
+        
+        
+class ReviewList(generics.ListAPIView):
+    serializer_class = ReviewSerializer
+    
+    def get_queryset(self):
+        pk = self.kwargs['pk']
+        return Review.objects.filter(answer_id=pk)
+    
+class ReviewDetail(generics.RetrieveDestroyAPIView):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    
