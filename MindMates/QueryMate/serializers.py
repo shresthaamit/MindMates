@@ -59,7 +59,7 @@ class AnswerSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
     class Meta:
         model = Answer
-        fields = ['id', 'user', 'content', 'created_at', 'updated_at','review_answers']
+        fields = ['id', 'user', 'content', 'created_at', 'updated_at','review_answers','upvote_count','downvote_count']
         read_only_fields = ['user', 'created_at', 'updated_at']
         
         

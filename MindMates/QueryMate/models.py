@@ -69,22 +69,43 @@ class Answer(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     upvotes = models.ManyToManyField(User, related_name='upvoted_answers', blank=True)
     downvotes = models.ManyToManyField(User, related_name='downvoted_answers', blank=True)
+    upvote_count = models.PositiveIntegerField(default=0)  # Upvote count
+    downvote_count = models.PositiveIntegerField(default=0)
     
     class Meta:
         unique_together = ('user', 'question')
     def __str__(self):
         return f"Answer by {self.user} on {self.question}"
 
-    def add_upvote(self, user):
-        if user in self.downvotes.all():
-            self.downvotes.remove(user)
-        self.upvotes.add(user)
-
-    def add_downvote(self, user):
+    def toggle_upvote(self, user):
         if user in self.upvotes.all():
             self.upvotes.remove(user)
-        self.downvotes.add(user)
-    
+            self.upvote_count -= 1
+            message = 'Upvote removed'
+        else:
+            if user in self.downvotes.all():
+                self.downvotes.remove(user)
+                self.downvote_count -= 1
+            self.upvotes.add(user)
+            self.upvote_count += 1
+            message = 'Answer upvoted'
+        self.save()
+        return message
+
+    def toggle_downvote(self, user):
+        if user in self.downvotes.all():
+            self.downvotes.remove(user)
+            self.downvote_count -= 1
+            message = 'Downvote removed'
+        else:
+            if user in self.upvotes.all():
+                self.upvotes.remove(user)
+                self.upvote_count -= 1
+            self.downvotes.add(user)
+            self.downvote_count += 1
+            message = 'Answer downvoted'
+        self.save()
+        return message
 
 class Review(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')

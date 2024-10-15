@@ -110,6 +110,18 @@ class AnswerViewset(viewsets.ModelViewSet):
         
         serializer.save(user=self.request.user, question=question)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def upvote(self, request, pk=None):
+        answer = self.get_object()
+        message = answer.toggle_upvote(request.user)
+        return Response({'status': message, 'upvote_count': answer.upvote_count}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def downvote(self, request, pk=None):
+        answer = self.get_object()
+        message = answer.toggle_downvote(request.user)
+        return Response({'status': message, 'downvote_count': answer.downvote_count}, status=status.HTTP_200_OK)
     # def perform_create(self, serializer):
     #     question_id = self.kwargs.get('question_pk')
     #     try:
