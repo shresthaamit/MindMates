@@ -154,3 +154,6 @@ class ReviewDetail(generics.RetrieveDestroyAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     
+def getdetail():
+    print( "Retview Detail")
+getdetail()
