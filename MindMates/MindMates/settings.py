@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-adcjc$)wrsy$-_h_#2%woi(=8lybx93bhk928$c@#n5f2sbuus
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -40,10 +40,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     'channels',
-    "oauth2_provider",
+    "oauth2_provider", 
+    'rest_framework_simplejwt', 
     "social_django",
     "rest_framework_social_oauth2",
-    "rest_framework_nested",
+    "rest_framework_nested",    
     "Users",
     "QueryMate",
     "Chats"
@@ -93,9 +94,13 @@ DATABASES = {
     }
 }
 REST_FRAMEWORK = {
+    # 'DEFAULT_AUTHENTICATION_CLASSES': [
+    #     'rest_framework.permissions.IsAuthenticatedOrReadOnly'
+    # ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
+        # 'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'oauth2_provider.contrib.rest_framework.OAuth2Authentication', 
         'rest_framework_social_oauth2.authentication.SocialAuthentication'
     ]
@@ -154,3 +159,8 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}

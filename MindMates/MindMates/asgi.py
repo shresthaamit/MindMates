@@ -10,7 +10,14 @@ https://docs.djangoproject.com/en/4.2/howto/deployment/asgi/
 import os
 
 from django.core.asgi import get_asgi_application
-
+from channels.routing import URLRouter,ProtocolTypeRouter
+from channels.security.websocket import AllowedHostsOriginValidator
+from Chats import routing
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "MindMates.settings")
-
-application = get_asgi_application()
+from .tokenauth_middleware import TokenAuthMiddleware
+# application = get_asgi_application()
+application = ProtocolTypeRouter({
+    "http":get_asgi_application(),
+    "websocket": AllowedHostsOriginValidator(  # new
+        TokenAuthMiddleware(URLRouter(routing.websocket_urlpatterns)))
+})

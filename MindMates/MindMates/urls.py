@@ -7,7 +7,10 @@ from django.urls import path, include
 from Users import routers as users_urls
 from QueryMate import routers as querymate_urls
 from django.conf import settings
-
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 auth_api_urls = [
     path('auth/', include('oauth2_provider.urls', namespace='oauth2_provider')), 
 ]
@@ -17,7 +20,10 @@ if settings.DEBUG:
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("accounts/", include(users_urls.router.urls)), 
     path("querymate/", include("QueryMate.urls")),  # QueryMate URLs
+    path("chats/", include("Chats.urls")),
     *auth_api_urls,  # OAuth2 URLs
 ]
