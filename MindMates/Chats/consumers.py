@@ -1,68 +1,82 @@
-import base64
 import json
-import secrets
-from datetime import datetime
-from asgiref.sync import async_to_sync
-from channels.generic.websocket import WebsocketConsumer
-from django.core.files.base import ContentFile
+from channels.generic.websocket import AsyncWebsocketConsumer
+from django.contrib.auth.models import AnonymousUser
+from .models import Conversation, Message
 from Users.models import User
-from .models import Conversation,Message
-from .serializers import MessageSerializer
+from channels.db import database_sync_to_async
 
-class ChatConsumer(WebsocketConsumer):
-    def connect(self):
-        print("Connecting")
-        self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
-        self.room_group_name = f"chat_{self.room_name}"
-        
-        async_to_sync(self.channel_layer.group_add)(
-            self.room_group_name, self.channel_name
+class ChatConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        if self.scope["user"].is_anonymous:
+            await self.close()
+            return
+
+        self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
+        self.room_group_name = f'chat_{self.conversation_id}'
+
+        # Verify user has permission to access this conversation
+        if not await self.verify_conversation_access():
+            await self.close()
+            return
+
+        # Join room group
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
         )
-        self.accept()
-        
-    def disconnect(self, close_code):
-        async_to_sync(self.channel_layer.group_discard)(
-            self.room_group_name, self.channel_name
-        )
-        
-    def receive(self, text_data=None, bytes_data=None):
+
+        await self.accept()
+
+    @database_sync_to_async
+    def verify_conversation_access(self):
+        try:
+            conversation = Conversation.objects.get(id=self.conversation_id)
+            user = self.scope["user"]
+            return user == conversation.initiator or user == conversation.receiver
+        except Conversation.DoesNotExist:
+            return False
+
+    async def disconnect(self, close_code):
+        # Leave room group
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+
+    async def receive(self, text_data):
         text_data_json = json.loads(text_data)
-        chat_type = {'type':'chat_message'}
-        return_dict ={**chat_type, **text_data_json}
-        async_to_sync(self.channel_layer.group_send)(
-            self.room_group_name, return_dict,
+        message = text_data_json['message']
+        sender_id = text_data_json['sender_id']
+
+        # Save message to database
+        message_obj = await self.save_message(message, sender_id)
+
+        # Send message to room group
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat_message',
+                'message': message,
+                'sender_id': sender_id,
+                'timestamp': str(message_obj.created_at)
+            }
         )
-        
-    def chat_message(self, event):
-        text_data_json = event.copy()
-        text_data_json.pop("type")
-        message,attachment = (
-            text_data_json.get("attachment"),
-            text_data_json['message']
+
+    @database_sync_to_async
+    def save_message(self, message_content, sender_id):
+        conversation = Conversation.objects.get(id=self.conversation_id)
+        sender = User.objects.get(id=sender_id)
+        return Message.objects.create(
+            conversation=conversation,
+            sender=sender,
+            content=message_content
         )
-        conversation = Conversation.objects.get(id=int(self.room_name))
-        sender = self.scope['user']
-        if attachment:
-            file_str, file_ext = attachment['data'],attachment['format']
-            
-            file_data  = ContentFile(
-                base64.b64encode(file_str),name=f"{secrets.token_hex(8)}.file{file_ext}"
-            )
-            _message = Message.objects.create(
-                sender =sender,
-                text = message,
-                conversation_id = conversation
-                
-            )
-            
-        else:
-            _message = Message.objects.create(
-                sender=sender,
-                text=message,
-                conversation_id=conversation,
-            )
-            
-        serializer = MessageSerializer(instance=_message)
-        self.send(
-            text_data=json.dumps(serializer.data)
-        )
+
+    async def chat_message(self, event):
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({
+            'message': event['message'],
+            'sender_id': event['sender_id'],
+            'timestamp': event['timestamp']
+        }))

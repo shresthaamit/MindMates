@@ -25,7 +25,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
 class ConversationSerializer(serializers.ModelSerializer):
     initiator = UserSerializer()
     receiver = UserSerializer()
-    message_set = MessageSerializer(many=True)
+    message_set = MessageSerializer(many=True, source='messages') 
     
     class Meta:
         model = Conversation
