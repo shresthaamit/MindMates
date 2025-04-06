@@ -25,7 +25,7 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("accounts/", include(users_urls.router.urls)), 
     path("querymate/", include("QueryMate.urls")),  # QueryMate URLs
-    path('chats/ws/', include(routing.websocket_urlpatterns)),
+    # path('chats/', include('Chats.routing')),
     path("chats/", include("Chats.urls")),
     *auth_api_urls,  # OAuth2 URLs
 ]
