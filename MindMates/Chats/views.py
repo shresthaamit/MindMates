@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .models import Conversation
+from .models import Conversation,Message
 from rest_framework.decorators import api_view,permission_classes
 from rest_framework.response import Response
 from Users.models import User
@@ -58,3 +58,15 @@ def conversations(request):
     conversationlist = Conversation.objects.filter(Q(initiator=request.user) | Q(receiver=request.user))
     serializer = ConversationSerializer(instance=conversationlist, many=True, context={'request': request})
     return Response(serializer.data)
+@api_view(['PATCH'])
+def mark_message_read(request, message_id):
+    try:
+        message = Message.objects.get(
+            id=message_id,
+            conversation__receiver=request.user  # Only receiver can mark read
+        )
+        message.is_read = True
+        message.save()
+        return Response({"status": "marked as read"})
+    except Message.DoesNotExist:
+        return Response({"error": "Message not found"}, status=404)

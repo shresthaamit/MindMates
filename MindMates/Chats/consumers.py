@@ -27,6 +27,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if data.get('type') == 'chat_message':
                 await self.process_chat_message(data)
                 
+            if data.get('type') == 'mark_read':
+               await self.mark_message_as_read(data['message_id'])
+                
         except Exception as e:
             print(f"Error: {str(e)}")
             await self.close(code=4000)
@@ -134,3 +137,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
         print(f"User disconnected with code {close_code}")
+        
+    @database_sync_to_async
+    def mark_message_as_read(self, message_id):
+        Message.objects.filter(
+        id=message_id,
+        conversation_id=self.conversation_id,
+        is_read=False
+         ).update(is_read=True)
