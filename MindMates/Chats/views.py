@@ -67,6 +67,8 @@ def mark_message_read(request, message_id):
         )
         message.is_read = True
         message.save()
+        print("MArked as read")
         return Response({"status": "marked as read"})
+    
     except Message.DoesNotExist:
         return Response({"error": "Message not found"}, status=404)
