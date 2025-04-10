@@ -1,9 +1,10 @@
+from datetime import timezone
 from django.shortcuts import render
 from .models import Conversation,Message
 from rest_framework.decorators import api_view,permission_classes
 from rest_framework.response import Response
 from Users.models import User
-from .serializers import ConversationListSerializer, ConversationSerializer
+from .serializers import ConversationListSerializer, ConversationSerializer,MessageSerializer
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import redirect, reverse
@@ -58,6 +59,7 @@ def conversations(request):
     conversationlist = Conversation.objects.filter(Q(initiator=request.user) | Q(receiver=request.user))
     serializer = ConversationSerializer(instance=conversationlist, many=True, context={'request': request})
     return Response(serializer.data)
+
 @api_view(['PATCH'])
 def mark_message_read(request, message_id):
     try:
@@ -70,5 +72,37 @@ def mark_message_read(request, message_id):
         print("MArked as read")
         return Response({"status": "marked as read"})
     
+    except Message.DoesNotExist:
+        return Response({"error": "Message not found"}, status=404)
+    
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def edit_message(request, message_id):
+    try:
+        message = Message.objects.get(
+            id=message_id,
+            sender=request.user,  # Only sender can edit
+            is_deleted=False      # Can't edit deleted messages
+        )
+        serializer = MessageSerializer(message, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(is_edited=True)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+    except Message.DoesNotExist:
+        return Response({"error": "Message not found or unauthorized"}, status=404)
+    
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_message(request, message_id):
+    try:
+        message = Message.objects.get(
+            id=message_id,
+            sender=request.user  # Only sender can delete
+        )
+        message.is_deleted = True
+        message.delete()
+        return Response({"status": "message deleted"})
     except Message.DoesNotExist:
         return Response({"error": "Message not found"}, status=404)

@@ -1,3 +1,4 @@
+from datetime import timezone
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -28,7 +29,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.process_chat_message(data)
                 
             if data.get('type') == 'mark_read':
-               await self.mark_message_as_read(data['message_id'])
+                await self.mark_message_as_read(data['message_id'])
+            if data.get('type') == 'edit_message':
+                await self.handle_edit_message(data)
+                
+            if data.get('type') == 'delete_message':
+                await self.handle_delete_message(data)
+                
                 
         except Exception as e:
             print(f"Error: {str(e)}")
@@ -145,3 +152,60 @@ class ChatConsumer(AsyncWebsocketConsumer):
         conversation_id=self.conversation_id,
         is_read=False
          ).update(is_read=True)
+        
+# start  edit delete
+    async def handle_edit_message(self, data):
+        success = await self.edit_message_db(
+            data['message_id'],
+            data['new_content']
+        )
+        if success:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'message.edited',
+                    'message_id': data['message_id'],
+                    'new_content': data['new_content'],
+                    'edited_at': timezone.now().isoformat()
+                }
+            )
+
+    async def handle_delete_message(self, data):
+        success = await self.delete_message_db(data['message_id'])
+        if success:
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'message.deleted',
+                    'message_id': data['message_id']
+                }
+            )
+
+    @database_sync_to_async
+    def edit_message_db(self, message_id, new_content):
+        try:
+            message = Message.objects.get(
+                id=message_id,
+                sender=self.scope['user'],
+                is_deleted=False
+            )
+            message.content = new_content
+            message.is_edited = True
+            message.save()
+            return True
+        except Message.DoesNotExist:
+            return False
+
+    @database_sync_to_async 
+    def delete_message_db(self, message_id):
+        try:
+            message = Message.objects.get(
+                id=message_id,
+                sender=self.scope['user']
+            )
+            message.is_deleted = True
+            message.deleted_at = timezone.now()
+            message.save()
+            return True
+        except Message.DoesNotExist:
+            return False
