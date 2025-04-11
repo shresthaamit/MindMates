@@ -35,6 +35,7 @@ def create_conversation(request):
     ).first()
 
     if conversation:
+        print ("Conversation already exists.")
         return Response({"message": "Conversation already exists."})
 
     # Create new conversation
