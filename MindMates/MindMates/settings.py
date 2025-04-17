@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     "rest_framework_nested",    
     "Users",
     "QueryMate",
-    "Chats"
+    "Chats",
+    "Communities"
 ]
 
 MIDDLEWARE = [

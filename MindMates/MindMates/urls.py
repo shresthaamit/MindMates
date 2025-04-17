@@ -27,5 +27,6 @@ urlpatterns = [
     path("querymate/", include("QueryMate.urls")),  # QueryMate URLs
     # path('chats/', include('Chats.routing')),
     path("chats/", include("Chats.urls")),
+    # path("communities",include("Communities.urls"))
     *auth_api_urls,  # OAuth2 URLs
 ]
