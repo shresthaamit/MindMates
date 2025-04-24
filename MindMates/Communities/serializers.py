@@ -23,8 +23,8 @@ class CommunitySerializer(serializers.ModelSerializer):
         return community
         
 class CommunityDetailSerializer(serializers.ModelSerializer):
-    creators = UserSerializer()
-    member = UserSerializer()
+    creaters  = UserSerializer(read_only=True)
+    member = UserSerializer(many=True, read_only=True)
     member_count = serializers.SerializerMethodField()
     is_member = serializers.SerializerMethodField()
     class Meta:
@@ -36,7 +36,7 @@ class CommunityDetailSerializer(serializers.ModelSerializer):
     def get_is_member(self, obj):
         request =self.context.get('request')
         if request and request.user.is_authenticated:
-            return obj.member.filter(id = request.user.id).exists()
+            return obj.members.filter(id = request.user.id).exists()
         return False
     
 class JoinLeaveSerializer(serializers.Serializer):
@@ -49,7 +49,7 @@ class JoinLeaveSerializer(serializers.Serializer):
         return value
 
 class CommunityMessageSerializer(serializers.ModelSerializer):
-    sender = UserSerializer()
+    sender = UserSerializer(read_only=True)
     sender_id = serializers.IntegerField(write_only=True, required =False)
     community_id = serializers.IntegerField(write_only=True, required=False)
     class Meta:
@@ -61,3 +61,4 @@ class CommunityMessageSerializer(serializers.ModelSerializer):
         validated_data.pop('sender_id', None)
         validated_data.pop('community_id', None)
         return super().create(validated_data)
+    
