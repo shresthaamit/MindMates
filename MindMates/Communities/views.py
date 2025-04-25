@@ -30,10 +30,25 @@ class CommunityDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class JoinCommunity(APIView):
     permission_classes =[permissions.IsAuthenticated]
-    def post(self, request,pk):
-        community = get_object_or_404(Community,pk)
+    def post(self, request, pk):
+        community = get_object_or_404(Community, pk=pk)
+        
+        # Check if user is already a member
+        if community.members.filter(id=request.user.id).exists():
+            return Response(
+                {'status': 'User is already a member'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         community.members.add(request.user)
-        return Response({'status':'successfully joined'}, status=status.HTTP_200_OK)
+        return Response(
+            {'status': 'successfully joined'}, 
+            status=status.HTTP_200_OK
+        )
+    # def post(self, request,pk):
+    #     community = get_object_or_404(Community,pk=pk)
+    #     community.members.add(request.user)
+    #     return Response({'status':'successfully joined'}, status=status.HTTP_200_OK)
     
 class LeaveCommunity(APIView):
     permission_classes =[permissions.IsAuthenticated]

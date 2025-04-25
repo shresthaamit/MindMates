@@ -29,7 +29,7 @@ class CommunityDetailSerializer(serializers.ModelSerializer):
     is_member = serializers.SerializerMethodField()
     class Meta:
         model= Community
-        fields = ['id','name','description','creaters','members','member_count','created_at','images','is_member']
+        fields = ['id','name','description','creaters','member','member_count','created_at','image','is_member']
     def get_member_count(self,obj):
         return obj.members.count()
     
