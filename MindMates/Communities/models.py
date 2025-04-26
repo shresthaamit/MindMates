@@ -24,3 +24,5 @@ class CommunityMessage(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+    def __str__(self):
+        return f"{self.sender.username}: {self.content[:20]}..."
