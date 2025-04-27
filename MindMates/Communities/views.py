@@ -17,13 +17,14 @@ class CommunityListCreate(generics.ListCreateAPIView):
     def get_queryset(self):
         return self.request.user.communities.all()
             
-    
 class CommunityDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Community.objects.all()
     serializer_class = CommunityDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     def perform_destroy(self, instance):
         if instance.creaters == self.request.User:
+            
+            print(" delete")
             instance.delete()
         else:
             raise PermissionDenied("only community creators can delete")
@@ -38,8 +39,7 @@ class JoinCommunity(APIView):
             return Response(
                 {'status': 'User is already a member'}, 
                 status=status.HTTP_400_BAD_REQUEST
-            )
-            
+            )    
         community.members.add(request.user)
         return Response(
             {'status': 'successfully joined'}, 
@@ -68,8 +68,7 @@ class RemoveMember(APIView):
         user = get_object_or_404(User, pk=serializer.validated_data['user_id'])
         community.members.remove(user)
         return Response({'status': 'member removed'}, status=status.HTTP_200_OK)
-        
-        
+              
 class CommunityMessageListCreate(generics.ListCreateAPIView):
     serializer_class = CommunityMessageSerializer
     permission_classes = [permissions.IsAuthenticated]
