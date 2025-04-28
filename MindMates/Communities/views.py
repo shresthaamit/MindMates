@@ -6,6 +6,7 @@ from rest_framework.response import  Response
 from django.core.exceptions import PermissionDenied
 from .models import *
 from .serializers import *
+from rest_framework.parsers import MultiPartParser, FormParser
 # Create your views here.
 class CommunityListCreate(generics.ListCreateAPIView):
     queryset = Community.objects.all()
@@ -23,8 +24,6 @@ class CommunityDetail(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     def perform_destroy(self, instance):
         if instance.creaters == self.request.User:
-            
-            print(" delete")
             instance.delete()
         else:
             raise PermissionDenied("only community creators can delete")
@@ -72,6 +71,7 @@ class RemoveMember(APIView):
 class CommunityMessageListCreate(generics.ListCreateAPIView):
     serializer_class = CommunityMessageSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
     
     def get_queryset(self):
         community_id = self.kwargs['pk']
@@ -83,8 +83,17 @@ class CommunityMessageListCreate(generics.ListCreateAPIView):
         # Only allow posting if user is a member
         if self.request.user not in community.members.all():
             raise PermissionDenied("You are not a member of this community")
-
-        serializer.save(
-            sender=self.request.user,
-            community=community
-        )
+        file = self.request.FILES.get('file')
+        if file:
+            serializer.save(
+                sender= self.request.user,
+                community  = community,
+                file = file,
+                file_name = file.name,
+                file_size = file.size
+                )
+        else:
+            serializer.save(
+                sender=self.request.user,
+                community=community
+            )

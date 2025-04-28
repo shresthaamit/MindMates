@@ -7,6 +7,7 @@ class Community(models.Model):
     description= models.TextField()
     creaters = models.ForeignKey(User, on_delete=models.CASCADE, related_name='create_communities')
     members = models.ManyToManyField(User,related_name='communities')
+    online_members = models.ManyToManyField(User, related_name='online_communities', blank=True)
     created_at= models.DateTimeField(auto_now_add=True)
     image = models.ImageField(upload_to='community_image', null=True, blank=True)
     
