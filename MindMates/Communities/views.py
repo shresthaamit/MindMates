@@ -1,3 +1,4 @@
+import re
 from django.shortcuts import render
 from rest_framework import generics,permissions,status
 from rest_framework.views import APIView
@@ -6,6 +7,9 @@ from rest_framework.response import  Response
 from django.core.exceptions import PermissionDenied
 from .models import *
 from .serializers import *
+
+from rest_framework.parsers import MultiPartParser
+from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
 # Create your views here.
 class CommunityListCreate(generics.ListCreateAPIView):
@@ -97,3 +101,46 @@ class CommunityMessageListCreate(generics.ListCreateAPIView):
                 sender=self.request.user,
                 community=community
             )
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser])
+def upload_file(request, community_id):
+    """Handle actual file uploads via HTTP"""
+    file = request.FILES.get('file')
+    if not file:
+        return Response({"error": "No file provided"}, status=400)
+    
+    # Validate community membership
+    community = get_object_or_404(Community, pk=community_id)
+    if request.user not in community.members.all():
+        return Response({"error": "Not a member of this community"}, status=403)
+    
+    # Validate file size
+    if file.size > 10 * 1024 * 1024:  # 10MB
+        return Response({"error": "File too large (max 10MB)"}, status=413)
+    
+    # Validate file extension
+    allowed_extensions = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx']
+    file_ext = '.' + file.name.split('.')[-1].lower()
+    if file_ext not in allowed_extensions:
+        return Response({"error": f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"}, status=415)
+    
+    # Sanitize filename
+    safe_name = re.sub(r'[^\w\-_. ]', '', file.name)
+    
+    # Save file
+    message = CommunityMessage.objects.create(
+        community=community,
+        sender=request.user,
+        file=file,
+        file_name=safe_name,
+        file_size=file.size
+    )
+    
+    return Response({
+        "type": "file_upload_success",
+        "message_id": message.id,
+        "file_url": message.file.url,  # URL to access the file
+        "file_name": message.file_name,
+        "file_size": message.file_size
+    })

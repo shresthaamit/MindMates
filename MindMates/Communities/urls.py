@@ -7,4 +7,5 @@ urlpatterns = [
     path('<int:pk>/leave/', views.LeaveCommunity.as_view(),name='leave-community'),
     path('<int:pk>/remove/',views.RemoveMember.as_view(), name='remove-member'),
     path('<int:pk>/messages/', views.CommunityMessageListCreate.as_view(), name='community-messages'),
+    path('<int:community_id>/upload/', views.upload_file, name='file-upload'),
 ]

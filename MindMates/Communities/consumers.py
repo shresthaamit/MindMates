@@ -8,13 +8,24 @@ from .models import Community, CommunityMessage
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 class CommunityChatConsumer(AsyncWebsocketConsumer):
+    WS_CLOSE_CODES = {
+        400: 4000,  # Bad Request
+        401: 4001,  # Unauthorized
+        403: 4003,  # Forbidden
+        404: 4004,  # Not Found
+        413: 4009,  # Payload Too Large
+        415: 4010,  # Unsupported Media Type
+        500: 4500   # Internal Server Error
+    }
     
     MAX_FILE_SIZE = 10 * 1024 * 1024 
     ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx']
     
     async def connect(self):
         await self.accept()
-        self.awaiting_auth = True
+        self.connected = True
+        self.authenticated = False
+        self.close_code = None
         self.community_id = self.scope['url_route']['kwargs']['pk']
         print(f"\n=== New community connection attempt for community {self.community_id} ===")
 
@@ -50,29 +61,47 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"Error: {str(e)}")
             await self.send_error("Internal server error", status=500)
-    async def send_error(self, message, http_code=400):
-        """Send error message and close connection with proper WebSocket code"""
+    async def send_error(self, message, status=400):
+        """Safe error sending that handles closed connections"""
+        if not self.connected or hasattr(self, 'close_code'):
+            return
+            
         error_response = {
             'type': 'error',
             'message': message,
-            'http_code': http_code,
+            'status': status,
             'timestamp': timezone.now().isoformat()
         }
-        await self.send(text_data=json.dumps(error_response))
         
-        # Convert HTTP code to valid WebSocket close code
-        ws_code = self.WS_CLOSE_CODES.get(http_code, 4000)
-        await self.close(code=ws_code)
-    # async def send_error(self, message, status=400):
-    #     error_response = {
-    #         'type': 'error',
-    #         'message': message,
-    #         'status': status,
-    #         'timestamp': timezone.now().isoformat()
-    #     }
-    #     await self.send(text_data=json.dumps(error_response))
-    #     if status >= 400:
-    #         await self.close(code=status)
+        try:
+            await self.send(text_data=json.dumps(error_response))
+        except Exception as e:
+            print(f"Could not send error message: {str(e)}")
+            return
+            
+        ws_code = self.WS_CLOSE_CODES.get(status, 4000)
+        try:
+            await self.close(code=ws_code)
+            self.close_code = ws_code
+            self.connected = False
+        except Exception as e:
+            print(f"Could not close connection cleanly: {str(e)}")
+    async def send_recent_messages(self):
+        """Send last 20 messages when user connects"""
+        messages = await self.get_recent_messages()
+        await self.send(text_data=json.dumps({
+            'type': 'message_history',
+            'messages': messages
+        }))
+
+    @database_sync_to_async
+    def get_recent_messages(self):
+        return list(CommunityMessage.objects.filter(
+            community_id=self.community_id,
+            is_deleted=False
+        ).order_by('-created_at')[:20].values(
+            'id', 'content', 'file', 'file_name', 'sender__username', 'created_at'
+        ))
     async def process_community_message(self, data):
         message_content = data.get('message', '').strip()
         if not message_content:
@@ -102,10 +131,10 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
         file_name = data.get('file_name')
         file_size = data.get('file_size')
         message = data.get('message', '')
-        
+
         # Validate required fields
         if not all([file_url, file_name, file_size]):
-            await self.send_error("Missing file data (url, name, or size)", status=400)
+            await self.send_error("Missing file data (url, name, or size)", 400)
             return
 
         # Validate file size
@@ -114,22 +143,22 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             if file_size > self.MAX_FILE_SIZE:
                 await self.send_error(
                     f"File too large (max {self.MAX_FILE_SIZE//(1024*1024)}MB)", 
-                    status=413
+                    413
                 )
                 return
             if file_size <= 0:
-                await self.send_error("Invalid file size", status=400)
+                await self.send_error("Invalid file size", 400)
                 return
         except (ValueError, TypeError):
-            await self.send_error("Invalid file size format", status=400)
+            await self.send_error("Invalid file size format", 400)
             return
 
         # Validate file type
-        file_ext = '.' + file_url.split('.')[-1].lower()
+        file_ext = '.' + file_name.split('.')[-1].lower()  # Changed from file_url to file_name
         if file_ext not in self.ALLOWED_EXTENSIONS:
             await self.send_error(
                 f"Invalid file type. Allowed: {', '.join(self.ALLOWED_EXTENSIONS)}",
-                status=415
+                415
             )
             return
 
@@ -153,7 +182,7 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
         )
         
         if not saved_message:
-            await self.send_error("Failed to save file metadata", status=500)
+            await self.send_error("Failed to save file metadata", 500)
             return
 
         # Broadcast to group
@@ -180,14 +209,12 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def save_file_message(self, file_url, file_name, file_size, content):
         try:
-            if CommunityMessage.objects.filter(file_url=file_url).exists():
-                return None 
             community = Community.objects.get(id=self.community_id)
             message = CommunityMessage.objects.create(
                 community=community,
                 sender=self.user,
                 content=content,
-                file_url=file_url,
+                file_url=file_url,  # Using the file_url field
                 file_name=file_name,
                 file_size=file_size
             )
