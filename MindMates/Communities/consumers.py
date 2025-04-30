@@ -23,6 +23,7 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
     
     async def connect(self):
         await self.accept()
+        self.awaiting_auth = True 
         self.connected = True
         self.authenticated = False
         self.close_code = None
@@ -31,6 +32,8 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         try:
+            if not hasattr(self, 'awaiting_auth'):
+                self.awaiting_auth = True
             data = json.loads(text_data)
             
             if self.awaiting_auth:
@@ -124,79 +127,72 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             'is_edited': False
         }
         await self.broadcast_message(response)
-        
     async def process_file_share(self, data):
-        """Handle file sharing with complete validation"""
-        file_url = data.get('file_url')
+        """Handles both direct uploads (Base64) and URL shares"""
         file_name = data.get('file_name')
-        file_size = data.get('file_size')
         message = data.get('message', '')
-
-        # Validate required fields
-        if not all([file_url, file_name, file_size]):
-            await self.send_error("Missing file data (url, name, or size)", 400)
-            return
-
-        # Validate file size
-        try:
-            file_size = int(file_size)
-            if file_size > self.MAX_FILE_SIZE:
-                await self.send_error(
-                    f"File too large (max {self.MAX_FILE_SIZE//(1024*1024)}MB)", 
-                    413
-                )
-                return
-            if file_size <= 0:
-                await self.send_error("Invalid file size", 400)
-                return
-        except (ValueError, TypeError):
-            await self.send_error("Invalid file size format", 400)
-            return
-
-        # Validate file type
-        file_ext = '.' + file_name.split('.')[-1].lower()  # Changed from file_url to file_name
-        if file_ext not in self.ALLOWED_EXTENSIONS:
-            await self.send_error(
-                f"Invalid file type. Allowed: {', '.join(self.ALLOWED_EXTENSIONS)}",
-                415
-            )
-            return
-
-        # Sanitize filename
-        safe_name = re.sub(r'[^\w\-_. ]', '', file_name)
-        if safe_name != file_name:
-            await self.send(json.dumps({
-                'type': 'warning',
-                'message': 'Filename was sanitized for security',
-                'original_name': file_name,
-                'safe_name': safe_name
-            }))
-            file_name = safe_name
-
-        # Save to database
-        saved_message = await self.save_file_message(
-            file_url=file_url,
-            file_name=file_name,
-            file_size=file_size,
-            content=message
-        )
         
-        if not saved_message:
-            await self.send_error("Failed to save file metadata", 500)
+        # Case 1: Direct file upload (Base64)
+        if 'file_data' in data:
+            try:
+                import base64
+                from django.core.files.base import ContentFile
+                
+                # Extract Base64 data (handle data: URLs)
+                header, encoded_data = data['file_data'].split(',', 1)
+                file_bytes = base64.b64decode(encoded_data)
+                file_size = len(file_bytes)
+                
+                # Validate size
+                if file_size > self.MAX_FILE_SIZE:
+                    await self.send_error(f"File too large (max {self.MAX_FILE_SIZE//(1024*1024)}MB)", 413)
+                    return
+                    
+                # Create Django file object
+                file_content = ContentFile(file_bytes, name=file_name)
+                
+                # Save to DB
+                saved_message = await self.save_file_message(
+                    file=file_content,  # Store in FileField
+                    file_name=file_name,
+                    file_size=file_size,
+                    content=message
+                )
+                
+            except Exception as e:
+                await self.send_error(f"Upload failed: {str(e)}", 500)
+                return
+
+        # Case 2: URL sharing (existing functionality)
+        elif 'file_url' in data:
+            file_url = data['file_url']
+            file_size = data.get('file_size', 0)
+            
+            if not file_url.startswith(('http://', 'https://')):
+                await self.send_error("Invalid URL (must start with http:// or https://)", 400)
+                return
+
+            saved_message = await self.save_file_message(
+                file_url=file_url,
+                file_name=file_name,
+                file_size=file_size,
+                content=message
+            )
+
+        else:
+            await self.send_error("Provide either 'file_data' (Base64) or 'file_url'", 400)
             return
 
-        # Broadcast to group
-        response = {
+        # Broadcast to all clients
+        await self.broadcast_message({
             'type': 'file_message',
             'message_id': saved_message.id,
-            'file_url': file_url,
-            'file_name': file_name,
-            'file_size': file_size,
-            'message': message,
+            'file_url': saved_message.file.url if saved_message.file else saved_message.file_url,
+            'file_name': saved_message.file_name,
+            'file_size': saved_message.file_size,
             'sender': await self.get_user_data(self.user),
             'timestamp': saved_message.created_at.isoformat()
-        }
-        await self.broadcast_message(response)
+        })
         # Broadcast message to community group
     async def broadcast_message(self, response):
         await self.channel_layer.group_send(
@@ -207,20 +203,21 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
         }
         )
     @database_sync_to_async
-    def save_file_message(self, file_url, file_name, file_size, content):
+    def save_file_message(self, file=None, file_url=None, file_name=None, file_size=None, content=''):
+        """Handles both file types in one method"""
         try:
             community = Community.objects.get(id=self.community_id)
-            message = CommunityMessage.objects.create(
+            return CommunityMessage.objects.create(
                 community=community,
                 sender=self.user,
                 content=content,
-                file_url=file_url,  # Using the file_url field
+                file=file,       # For direct uploads
+                file_url=file_url,  # For URL shares
                 file_name=file_name,
                 file_size=file_size
             )
-            return message
         except Exception as e:
-            print(f"Error saving file message: {str(e)}")
+            print(f"Error saving file: {str(e)}")
             return None
 
     @database_sync_to_async
@@ -268,6 +265,7 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
             self.awaiting_auth = False
+            self.authenticated = True
             await self.add_user_to_community_online_list()
             print(f"User {self.user.username} connected")
             print(f"User {self.user.username} connected to community {self.community_id}")
