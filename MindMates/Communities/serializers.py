@@ -61,4 +61,23 @@ class CommunityMessageSerializer(serializers.ModelSerializer):
         validated_data.pop('sender_id', None)
         validated_data.pop('community_id', None)
         return super().create(validated_data)
+class FileUploadSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(
+        required=False,  # Make file optional
+        allow_null=True,
+        style={'input_type': 'file', 'template': 'rest_framework/file.html'}
+    )
+    content = serializers.CharField(required=False, allow_blank=True)
     
+    class Meta:
+        model = CommunityMessage
+        fields = ['content', 'file']
+        extra_kwargs = {
+            'file': {'write_only': True}
+        }
+
+    def validate(self, data):
+        # Require either content or file
+        if not data.get('content') and not data.get('file'):
+            raise serializers.ValidationError("Either content or file must be provided")
+        return data

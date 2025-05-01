@@ -104,8 +104,21 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'oauth2_provider.contrib.rest_framework.OAuth2Authentication', 
-        'rest_framework_social_oauth2.authentication.SocialAuthentication'
+        'rest_framework_social_oauth2.authentication.SocialAuthentication',
+        
     ]
+}
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',  # This enables the web interface
+        'rest_framework.renderers.MultiPartRenderer',     # Important for file uploads
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
+    ],
 }
 AUTHENTICATION_BACKENDS = (
 
