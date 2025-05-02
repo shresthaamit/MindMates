@@ -55,7 +55,12 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
                 
             if data.get('type') == 'delete_message':
                 await self.handle_delete_message(data)
-                
+            if data.get('type') == 'like_message':
+                await self.handle_like(
+                    community_id=data['community_id'],
+                    message_id=data['message_id']
+                )
+                        
             else:
                 await self.send_error("Invalid message type", status=400)
                 
@@ -346,4 +351,10 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             return True
         except CommunityMessage.DoesNotExist:
             return False
-    
+    @database_sync_to_async
+    def handle_like(self, community_id, message_id):
+        message = CommunityMessage.objects.get(
+            id=message_id,
+            community_id=community_id
+        )
+        

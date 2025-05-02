@@ -52,11 +52,15 @@ class CommunityMessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
     sender_id = serializers.IntegerField(write_only=True, required =False)
     community_id = serializers.IntegerField(write_only=True, required=False)
+    like_count = serializers.IntegerField(read_only=True)
+    is_liked = serializers.SerializerMethodField()
     class Meta:
         model = CommunityMessage
-        fields = ['id','community','community_id','sender','sender_id','content','file', 'created_at', 'is_edited', 'is_deleted']
+        fields = ['id','community','community_id','sender','sender_id','content','file', 'created_at', 'is_edited', 'is_deleted','like_count', 'is_liked']
         read_only_fields = ['created_at', 'is_edited', 'is_deleted']
-        
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        return request and request.user.is_authenticated and request.user in obj.likes.all()
     def create(self, validated_data):
         validated_data.pop('sender_id', None)
         validated_data.pop('community_id', None)

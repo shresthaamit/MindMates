@@ -25,8 +25,18 @@ class CommunityMessage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_edited = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
+    likes = models.ManyToManyField(
+        User, 
+        related_name='liked_messages',
+        blank=True
+    )
+    like_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ['-created_at']
+    def update_like_count(self):
+        """Updates the cached like count"""
+        self.like_count = self.likes.count()
+        self.save(update_fields=['like_count'])
     def __str__(self):
         return f"{self.sender.username}: {self.content[:20]}..."

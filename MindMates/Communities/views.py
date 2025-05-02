@@ -16,6 +16,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from rest_framework.decorators import authentication_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.db import transaction
 # Create your views here.
 class CommunityListCreate(generics.ListCreateAPIView):
     queryset = Community.objects.all()
@@ -200,3 +201,42 @@ def debug_community(request, community_id):
         'members': list(community.members.values_list('id', flat=True)),
         'current_user': request.user.id
     })
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+def toggle_like(request, community_id, message_id):
+    try:
+        # Verify message belongs to community
+        message = CommunityMessage.objects.select_related('community').get(
+            id=message_id,
+            community_id=community_id
+        )
+        
+        # Verify user is community member
+        if not message.community.members.filter(id=request.user.id).exists():
+            return Response(
+                {"error": "Not a community member"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Like toggle logic...
+        user = request.user
+        with transaction.atomic():
+            if user in message.likes.all():
+                message.likes.remove(user)
+                liked = False
+            else:
+                message.likes.add(user)
+                liked = True
+            message.update_like_count()
+        
+        return Response({
+            "status": "success",
+            "liked": liked,
+            "like_count": message.like_count
+        })
+        
+    except CommunityMessage.DoesNotExist:
+        return Response(
+            {"error": "Message not found in this community"},
+            status=status.HTTP_404_NOT_FOUND
+        )

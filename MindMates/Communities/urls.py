@@ -9,4 +9,7 @@ urlpatterns = [
     path('<int:pk>/messages/', views.CommunityMessageListCreate.as_view(), name='community-messages'),
     path('<int:community_id>/upload/', views.upload_file, name='file-upload'),
     path('<int:community_id>/debug/', views.debug_community, name='file-upload'),
+    path('<int:community_id>/messages/<int:message_id>/like/', 
+     views.toggle_like, 
+     name='toggle-like')
 ]
