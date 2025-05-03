@@ -1,5 +1,9 @@
 from datetime import timezone
 import json
+import base64
+import uuid
+from django.core.files.base import ContentFile
+from django.db import transaction
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
@@ -35,6 +39,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 
             if data.get('type') == 'delete_message':
                 await self.handle_delete_message(data)
+            if data.get('type') == 'file_upload':
+        # Handle file upload via WebSocket (for smaller files)
+                await self.handle_file_upload(
+                data.get('file_data'),
+                data.get('content', '')
+                )
                 
                 
         except Exception as e:
@@ -43,11 +53,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def process_chat_message(self, data):
         message_content = data.get('message', '').strip()
-        if not message_content:
+        file_data = data.get('file')    
+        if not message_content and not file_data:
             return
             
         # Get conversation info and save message
-        conversation, saved_message = await self.get_conversation_and_save_message(message_content)
+        conversation, saved_message = await self.save_message(message_content,file_data)
         
         if not conversation:
             await self.close(code=4003)
@@ -58,6 +69,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'type': 'chat_message',
             'message_id': saved_message.id,
             'content': message_content,
+            'file_url': saved_message.file.url if saved_message.file else None,
             'sender': await self.get_user_data(self.user),
             'receiver': await self.get_other_user_data(conversation),
             'timestamp': saved_message.created_at.isoformat(),
@@ -65,13 +77,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }
         
         # Broadcast message
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat.message',
-                'data': response
-            }
-        )
+        await self.broadcast_message(response)
+        
+    @database_sync_to_async
+    def save_message(self, content, file_data=None):
+        try:
+            conversation = Conversation.objects.get(id=self.conversation_id)
+            message = Message(conversation=conversation, sender=self.user, content=content)
+            
+            if file_data:
+                # Handle base64 file upload
+                format, file_str = file_data.split(';base64,')
+                ext = format.split('/')[-1]
+                file = ContentFile(base64.b64decode(file_str), name=f'{uuid.uuid4()}.{ext}')
+                message.file = file
+            
+            message.save()
+            return conversation, message
+        except Exception:
+            print(f"Error saving message: {e}")
+            return None, None
 
     @database_sync_to_async
     def get_conversation_and_save_message(self, content):
@@ -209,3 +234,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return True
         except Message.DoesNotExist:
             return False
+    @database_sync_to_async
+    def handle_file_upload(self, file_data, content):
+        try:
+            conversation = Conversation.objects.get(id=self.conversation_id)
+            
+            # Process base64 file
+            format, file_str = file_data.split(';base64,')
+            ext = format.split('/')[-1]
+            file = ContentFile(
+                base64.b64decode(file_str),
+                name=f'{uuid.uuid4()}.{ext}'
+            )
+            
+            message = Message.objects.create(
+                conversation=conversation,
+                sender=self.user,
+                content=content,
+                file=file,
+                file_name=file.name
+            )
+            
+            return {
+                'type': 'file_message',
+                'message': {
+                    'id': message.id,
+                    'content': message.content,
+                    'file_url': message.file.url,
+                    'sender': {
+                        'id': self.user.id,
+                        'username': self.user.username
+                    },
+                    'timestamp': message.created_at.isoformat()
+                }
+            }
+        except Exception as e:
+            print(f"File upload error: {str(e)}")
+            return None

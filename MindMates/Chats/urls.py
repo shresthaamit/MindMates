@@ -9,5 +9,8 @@ urlpatterns = [
     path('messages/<int:message_id>/read/', views.mark_message_read),
     path('messages/<int:message_id>/edit/', views.edit_message),
     path('messages/<int:message_id>/delete/', views.delete_message),
+    path('<int:conversation_id>/messages/upload/', 
+         views.upload_private_file, 
+         name='upload-private-file'),
   
 ]
