@@ -12,5 +12,7 @@ urlpatterns = [
     path('<int:conversation_id>/messages/upload/', 
          views.upload_private_file, 
          name='upload-private-file'),
-  
+    
+    path('<int:conversation_id>/messages/<int:message_id>/like/', views.toggle_like, name='toggle-like'),
 ]
+  

@@ -14,7 +14,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from rest_framework.decorators import authentication_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
-
+from django.db import transaction
 # Create your views here.
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -195,3 +195,60 @@ def upload_private_file(request, conversation_id):
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+def toggle_like(request, conversation_id, message_id):
+    try:
+        # Get message with conversation verification
+        message = Message.objects.select_related('conversation').get(
+            id=message_id,
+            conversation_id=conversation_id
+        )
+        user = request.user
+        
+        # Verify participant
+        if user not in [message.conversation.initiator, message.conversation.receiver]:
+            return Response(
+                {"error": "Not a conversation participant"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Toggle like
+        with transaction.atomic():
+            if user in message.likes.all():
+                message.likes.remove(user)
+                action = "unliked"
+            else:
+                message.likes.add(user)
+                action = "liked"
+            message.update_like_count()
+        
+        # WebSocket broadcast
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{conversation_id}",
+                {
+                    "type": "message.liked",
+                    "message_id": message_id,
+                    "user_id": user.id,
+                    "action": action,
+                    "like_count": message.like_count
+                }
+            )
+        except Exception as e:
+            print(f"WebSocket error: {e}")
+
+        return Response({
+            "status": "success",
+            "action": action,
+            "like_count": message.like_count,
+            "is_liked": action == "liked"
+        })
+
+    except Message.DoesNotExist:
+        return Response(
+            {"error": "Message not found in this conversation"},
+            status=status.HTTP_404_NOT_FOUND
+        )

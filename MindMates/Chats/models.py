@@ -22,8 +22,17 @@ class Message(models.Model):
     is_edited = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    likes = models.ManyToManyField(
+        User,
+        related_name='like_messages',
+        blank=True
+    )
+    like_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ['-created_at']    
     def __str__(self):
         return f"Message from {self.sender} in {self.conversation}"
+    def update_like_count(self):
+        self.like_count = self.likes.count()
+        self.save(update_fields=['like_count'])

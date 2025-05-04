@@ -40,11 +40,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if data.get('type') == 'delete_message':
                 await self.handle_delete_message(data)
             if data.get('type') == 'file_upload':
-        # Handle file upload via WebSocket (for smaller files)
                 await self.handle_file_upload(
                 data.get('file_data'),
                 data.get('content', '')
                 )
+            if data.get('type') == 'like_message':
+                await self.handle_like(data['message_id'])
                 
                 
         except Exception as e:
@@ -271,3 +272,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"File upload error: {str(e)}")
             return None
+    @database_sync_to_async
+    def handle_like(self, message_id):
+        message = Message.objects.get(id=message_id)
+        user = self.user
+        
+        with transaction.atomic():
+            if user in message.likes.all():
+                message.likes.remove(user)
+                action = "unliked"
+            else:
+                message.likes.add(user)
+                action = "liked"
+            message.update_like_count()
+        
+        return {
+            'type': 'message.liked',
+            'message_id': message_id,
+            'user_id': user.id,
+            'action': action,
+            'like_count': message.like_count
+        }

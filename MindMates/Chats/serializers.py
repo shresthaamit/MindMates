@@ -46,3 +46,13 @@ class FileUploadSerializer(serializers.ModelSerializer):
         model = Message
         fields = ['content', 'file']
     
+class MessageLikeSerializer(serializers.ModelSerializer):
+    is_liked = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Message
+        fields = ['id', 'like_count', 'is_liked']
+    
+    def get_is_liked(self, obj):
+        request = self.context.get('request')
+        return request and request.user in obj.likes.all()
