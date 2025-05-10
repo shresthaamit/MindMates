@@ -68,19 +68,42 @@ def conversations(request):
     return Response(serializer.data)
 
 @api_view(['PATCH'])
+@authentication_classes([JWTAuthentication])
 def mark_message_read(request, message_id):
     try:
-        message = Message.objects.get(
-            id=message_id,
-            conversation__receiver=request.user  # Only receiver can mark read
+        # Get message where user is either participant
+        message = Message.objects.select_related('conversation').get(
+            Q(conversation__initiator=request.user) | Q(conversation__receiver=request.user),
+            id=message_id
         )
-        message.is_read = True
-        message.save()
-        print("MArked as read")
+        
+        # Allow both initiator and receiver to mark as read
+        if message.sender == request.user:
+            return Response(
+                {"error": "You cannot mark your own messages as read"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        if not message.is_read:
+            message.is_read = True
+            message.save()
+            
+            # WebSocket notification
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{message.conversation.id}",
+                {
+                    "type": "message.read",
+                    "message_id": message.id,
+                    "is_read": True,
+                    # "timestamp": timezone.now().isoformat()
+                }
+            )
+        
         return Response({"status": "marked as read"})
     
     except Message.DoesNotExist:
-        return Response({"error": "Message not found"}, status=404)
+        return Response({"error": "Message not found or access denied"}, status=status.HTTP_404_NOT_FOUND)
     
 
 @api_view(['PATCH'])

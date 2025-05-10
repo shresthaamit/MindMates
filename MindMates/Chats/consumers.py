@@ -173,11 +173,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
     @database_sync_to_async
     def mark_message_as_read(self, message_id):
-        Message.objects.filter(
-        id=message_id,
-        conversation_id=self.conversation_id,
-        is_read=False
-         ).update(is_read=True)
+        try:
+            message = Message.objects.select_related('conversation').get(
+                id=message_id,
+                conversation_id=self.conversation_id
+            )
+            
+            # Verify current user is the receiver
+            if message.conversation.receiver_id == self.user.id:
+                message.is_read = True
+                message.save()
+                return True
+            return False
+            
+        except Message.DoesNotExist:
+            return False
         
 # start  edit delete
     async def handle_edit_message(self, data):
