@@ -1,7 +1,34 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import UserProfile
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
+class EmailTokenObtainSerializer(TokenObtainPairSerializer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'] = serializers.EmailField(required=True)
+        self.fields.pop('username', None)
+
+    def validate(self, attrs):
+        email = attrs.pop('email')
+        password = attrs.pop('password')
+        
+        user = User.objects.filter(email=email).first()
+        
+        if user and user.check_password(password):
+            if not user.is_active:
+                raise serializers.ValidationError("User account is disabled.")
+            
+            refresh = RefreshToken.for_user(user)
+            return {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user_id': user.id,
+                'email': user.email,
+                'username': user.username
+            }
+        raise serializers.ValidationError("Invalid credentials")
 class UserProfileSerializer(serializers.ModelSerializer):
     user = serializers.HyperlinkedRelatedField(read_only=True,many=False,view_name="user-detail")
     class Meta:

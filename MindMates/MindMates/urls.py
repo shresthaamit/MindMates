@@ -8,6 +8,7 @@ from Users import routers as users_urls
 from QueryMate import routers as querymate_urls
 from django.conf import settings
 from Chats import routing 
+from Users.views import EmailTokenObtainPairView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -21,7 +22,7 @@ if settings.DEBUG:
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/', EmailTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path("accounts/", include(users_urls.router.urls)), 
     path("querymate/", include("QueryMate.urls")),  # QueryMate URLs
