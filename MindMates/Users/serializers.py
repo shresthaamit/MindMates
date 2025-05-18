@@ -49,7 +49,14 @@ class UserSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.method == 'POST':  # Remove `old_password` in POST requests
             self.fields.pop('old_password', None)
-
+    def validate_email(self, value):
+        request = self.context.get('request')
+        
+        # Only check for duplicates during registration (POST request)
+        if request and request.method == 'POST':
+            if User.objects.filter(email=value).exists():
+                raise serializers.ValidationError("A user with this email already exists.")
+        return value
     def validate(self, data):
         request = self.context['request']
         request_method = request.method

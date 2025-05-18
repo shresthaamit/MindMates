@@ -7,6 +7,7 @@ from django.urls import path, include
 from Users import routers as users_urls
 from QueryMate import routers as querymate_urls
 from django.conf import settings
+from django.conf.urls.static import static
 from Chats import routing 
 from Users.views import EmailTokenObtainPairView
 from rest_framework_simplejwt.views import (
@@ -31,3 +32,5 @@ urlpatterns = [
     path("communities/",include("Communities.urls")),
     *auth_api_urls,  # OAuth2 URLs
 ]
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
