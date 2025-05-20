@@ -39,10 +39,11 @@ class UserSerializer(serializers.ModelSerializer):
     old_password = serializers.CharField(write_only=True, required=False)
     username = serializers.CharField(read_only=True)    
     profile = UserProfileSerializer(source='userprofile', read_only=True)
+    date_joined = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = User
-        fields = ['url', 'id', 'username', 'email', 'first_name', 'last_name', 'password', 'old_password', 'profile']
+        fields = ['url', 'id', 'username', 'email', 'first_name', 'last_name', 'password', 'old_password', 'date_joined','profile']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
