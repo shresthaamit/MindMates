@@ -20,6 +20,7 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
 class UserProfileViewSet(viewsets.GenericViewSet,mixins.RetrieveModelMixin,mixins.UpdateModelMixin):
+    authentication_classes = [JWTAuthentication]
     permission_classes =[IsProfileUserOrReadOnly]
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer

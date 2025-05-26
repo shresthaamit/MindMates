@@ -59,13 +59,14 @@ class AnswerSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
     class Meta:
         model = Answer
-        fields = ['id', 'user', 'content', 'created_at', 'updated_at','review_answers','upvote_count','downvote_count']
+        fields = ['id', 'user', 'content','image', 'created_at', 'updated_at','review_answers','upvote_count','downvote_count']
         read_only_fields = ['user', 'created_at', 'updated_at']
         
         
     def validate(self, data):
         user =  self.context['request'].user
-        question = data.get('question')
+        question = self.context.get('question') 
+       
         if Answer.objects.filter(user=user,question=question).exists():
             raise serializers.ValidationError('You have already answered this question')
         return data
@@ -75,16 +76,17 @@ class AnswerSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class QuestionSerializer(serializers.ModelSerializer):
-    answer = AnswerSerializer(many=True)
+    answer = AnswerSerializer(many=True,read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     tag_ids = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), write_only=True, many=True, source='tags')
     user = serializers.StringRelatedField(read_only=True)
 
+    user_email = serializers.EmailField(source='user.email', read_only=True)
     class Meta:
         
         model = Question
         fields = [
-            'id', 'title', 'description', 'image', 'user', 'answer', 
+            'id', 'title', 'description', 'image', 'user', 'answer', 'user_email',
             'created_at', 'updated_at', 'tags', 'tag_ids','upvote_count','downvote_count'
         ]
         read_only_fields = ['user', 'created_at', 'updated_at']

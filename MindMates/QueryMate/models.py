@@ -1,6 +1,7 @@
 from django.db import models
 from Users.models import UserProfile
 from django.contrib.auth.models import User
+from django.db.models import F
 # Create your models here.
 class Tag(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -29,35 +30,48 @@ class Question(models.Model):
         return self.title
     
     def toggle_upvote(self, user):
-        if user in self.upvotes.all():
+        if self.upvotes.filter(id=user.id).exists():
             self.upvotes.remove(user)
-            self.upvote_count -= 1
+            self.upvote_count = F('upvote_count') - 1
             message = 'Upvote removed'
         else:
-            if user in self.downvotes.all():
+            if self.downvotes.filter(id=user.id).exists():
                 self.downvotes.remove(user)
-                self.downvote_count -= 1
+                self.downvote_count = F('downvote_count') - 1
             self.upvotes.add(user)
-            self.upvote_count += 1
+            self.upvote_count = F('upvote_count') + 1
             message = 'Question upvoted'
-        self.save()
-        return message
+
+        self.save(update_fields=['upvote_count', 'downvote_count'])
+        self.refresh_from_db(fields=['upvote_count', 'downvote_count'])
+
+        return {
+            "status": message,
+            "upvote_count": self.upvote_count,
+            "downvote_count": self.downvote_count
+        }
 
     def toggle_downvote(self, user):
-        if user in self.downvotes.all():
+        if self.downvotes.filter(id=user.id).exists():
             self.downvotes.remove(user)
-            self.downvote_count -= 1
+            self.downvote_count = F('downvote_count') - 1
             message = 'Downvote removed'
         else:
-            if user in self.upvotes.all():
+            if self.upvotes.filter(id=user.id).exists():
                 self.upvotes.remove(user)
-                self.upvote_count -= 1
+                self.upvote_count = F('upvote_count') - 1
             self.downvotes.add(user)
-            self.downvote_count += 1
+            self.downvote_count = F('downvote_count') + 1
             message = 'Question downvoted'
-        self.save()
-        return message
-    
+
+        self.save(update_fields=['upvote_count', 'downvote_count'])
+        self.refresh_from_db(fields=['upvote_count', 'downvote_count'])
+
+        return {
+            "status": message,
+            "upvote_count": self.upvote_count,
+            "downvote_count": self.downvote_count
+        }
     
 class Answer(models.Model):
     image  =  models.ImageField(upload_to='answers/images/', blank=True, null=True)
@@ -78,14 +92,17 @@ class Answer(models.Model):
         return f"Answer by {self.user} on {self.question}"
 
     def toggle_upvote(self, user):
-        if user in self.upvotes.all():
+        if self.upvotes.filter(id=user.id).exists():
+            # Already upvoted — remove it
             self.upvotes.remove(user)
-            self.upvote_count -= 1
+            self.upvote_count = max(0, self.upvote_count - 1)
             message = 'Upvote removed'
         else:
-            if user in self.downvotes.all():
+            # Remove downvote if present
+            if self.downvotes.filter(id=user.id).exists():
                 self.downvotes.remove(user)
-                self.downvote_count -= 1
+                self.downvote_count = max(0, self.downvote_count - 1)
+            # Add upvote
             self.upvotes.add(user)
             self.upvote_count += 1
             message = 'Answer upvoted'
@@ -93,20 +110,22 @@ class Answer(models.Model):
         return message
 
     def toggle_downvote(self, user):
-        if user in self.downvotes.all():
+        if self.downvotes.filter(id=user.id).exists():
+            # Already downvoted — remove it
             self.downvotes.remove(user)
-            self.downvote_count -= 1
+            self.downvote_count = max(0, self.downvote_count - 1)
             message = 'Downvote removed'
         else:
-            if user in self.upvotes.all():
+            # Remove upvote if present
+            if self.upvotes.filter(id=user.id).exists():
                 self.upvotes.remove(user)
-                self.upvote_count -= 1
+                self.upvote_count = max(0, self.upvote_count - 1)
+            # Add downvote
             self.downvotes.add(user)
             self.downvote_count += 1
             message = 'Answer downvoted'
         self.save()
         return message
-
 class Review(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
     answer = models.ForeignKey(Answer, on_delete=models.CASCADE, related_name='review_answers')
