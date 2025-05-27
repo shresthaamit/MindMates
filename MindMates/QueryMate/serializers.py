@@ -49,9 +49,18 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ('id', 'name')
 
 class ReviewSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField(read_only=True)
+    answer = serializers.PrimaryKeyRelatedField(read_only=True)
+    question_id = serializers.SerializerMethodField()
+    question_title = serializers.SerializerMethodField()
     class Meta:
         model = Review
         fields = "__all__"
+    def get_question_id(self, obj):
+        return obj.answer.question.id if obj.answer and obj.answer.question else None
+
+    def get_question_title(self, obj):
+        return obj.answer.question.title if obj.answer and obj.answer.question else None
 
 
 class AnswerSerializer(serializers.ModelSerializer):

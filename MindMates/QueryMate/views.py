@@ -36,7 +36,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import Tag, Question,Answer,Review
 from .serializers import TagSerializer, QuestionSerializer, VoteSerializer,AnswerSerializer,ReviewSerializer
-from .permissions import IsAuthenticated, IsOwner,IsAdminOrStaffOtherReadOnly
+from .permissions import IsAuthenticated, IsOwner,IsAdminOrStaffOtherReadOnly,IsReviewOwner
 from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import NotFound
@@ -172,24 +172,28 @@ class AnswerViewset(viewsets.ModelViewSet):
     #         # raise ValidationError("You have already answered this question.")
     #     serializer.save(user=self.request.user, question=question)
     #     return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-class ReviewCreate(generics.CreateAPIView):
+class ReviewViewset(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    def perform_create(self, serializer):
-        pk = self.kwargs.get('pk')
-        answer = Answer.objects.get(pk=pk)
-        serializer.save(answer=answer, user=self.request.user)
-        
-        
-class ReviewList(generics.ListAPIView):
-    serializer_class = ReviewSerializer
-    
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsReviewOwner]
+
     def get_queryset(self):
-        pk = self.kwargs['pk']
-        return Review.objects.filter(answer_id=pk)
-    
-class ReviewDetail(generics.RetrieveDestroyAPIView):
-    queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
-    
+        question_pk = self.kwargs.get('question_pk')
+        answer_pk = self.kwargs.get('answer_pk')
+
+            # Check answer exists and belongs to question
+        if not Answer.objects.filter(pk=answer_pk, question_id=question_pk).exists():
+            raise NotFound("Answer does not belong to the specified question.")
+
+        return Review.objects.filter(answer_id=answer_pk)
+
+    def perform_create(self, serializer):
+        question_pk = self.kwargs.get('question_pk')
+        answer_pk = self.kwargs.get('answer_pk')
+
+        try:
+            answer = Answer.objects.get(pk=answer_pk, question_id=question_pk)
+        except Answer.DoesNotExist:
+            raise NotFound("Answer not found for this question.")
+
+        serializer.save(answer=answer, user=self.request.user)
