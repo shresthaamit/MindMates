@@ -53,15 +53,23 @@ class ReviewSerializer(serializers.ModelSerializer):
     answer = serializers.PrimaryKeyRelatedField(read_only=True)
     question_id = serializers.SerializerMethodField()
     question_title = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
     class Meta:
         model = Review
-        fields = "__all__"
+        fields = ['id', 'content', 'user', 'answer', 'question_id', 'question_title','is_owner']
+        extra_kwargs = {
+            'content': {'required': True},
+        }
     def get_question_id(self, obj):
         return obj.answer.question.id if obj.answer and obj.answer.question else None
 
     def get_question_title(self, obj):
         return obj.answer.question.title if obj.answer and obj.answer.question else None
-
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            return obj.user == request.user
+        return False
 
 class AnswerSerializer(serializers.ModelSerializer):
     review_answers = ReviewSerializer(many=True, read_only=True)

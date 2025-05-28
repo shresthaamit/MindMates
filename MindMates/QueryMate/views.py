@@ -42,6 +42,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import NotFound
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import ValidationError
 
 class TagViewset(viewsets.ModelViewSet):
     queryset = Tag.objects.all()
@@ -195,5 +196,9 @@ class ReviewViewset(viewsets.ModelViewSet):
             answer = Answer.objects.get(pk=answer_pk, question_id=question_pk)
         except Answer.DoesNotExist:
             raise NotFound("Answer not found for this question.")
+
+        # Check if this user already reviewed this answer
+        if Review.objects.filter(answer=answer, user=self.request.user).exists():
+            raise ValidationError({"detail": "You have already reviewed this answer."})
 
         serializer.save(answer=answer, user=self.request.user)
