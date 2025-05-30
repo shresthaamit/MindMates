@@ -52,16 +52,23 @@ class TagViewset(viewsets.ModelViewSet):
 class QuestionViewset(viewsets.ModelViewSet):
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer
-    permission_classes = [permissions.AllowAny]
+    # permission_classes = [permissions.AllowAny]
     authentication_classes = [JWTAuthentication]
 
     def get_permissions(self):
-        if self.action == 'create':
+        if self.request.method in ['GET', 'HEAD', 'OPTIONS']:
+            # No authentication required for safe methods (GET)
+            return [AllowAny()]
+        elif self.request.method in ['PUT', 'PATCH', 'DELETE']:
+            # Only authenticated owners can update/delete
+            return [IsAuthenticated(), IsOwner()]
+        else:
+            # For POST and other unsafe methods, just require authentication
             return [IsAuthenticated()]
-        elif self.action in ['update', 'partial_update', 'destroy']:
-            return [IsOwner()]
-        return super().get_permissions()
-
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 

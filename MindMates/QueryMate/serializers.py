@@ -97,17 +97,22 @@ class QuestionSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     tag_ids = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), write_only=True, many=True, source='tags')
     user = serializers.StringRelatedField(read_only=True)
-
+    is_owner = serializers.SerializerMethodField()
     user_email = serializers.EmailField(source='user.email', read_only=True)
     class Meta:
         
         model = Question
         fields = [
             'id', 'title', 'description', 'image', 'user', 'answer', 'user_email',
-            'created_at', 'updated_at', 'tags', 'tag_ids','upvote_count','downvote_count'
+            'created_at', 'updated_at', 'tags', 'tag_ids','upvote_count','downvote_count','is_owner'
         ]
-        read_only_fields = ['user', 'created_at', 'updated_at']
-
+        read_only_fields = ['user', 'created_at', 'updated_at','is_owner']
+    def get_is_owner(self, obj):
+        request = self.context.get('request', None)
+        if request and hasattr(request, "user"):
+            return obj.user == request.user
+        return False   
+        
     def create(self, validated_data):
         tags = validated_data.pop('tags', [])
         question = Question.objects.create(**validated_data)
