@@ -31,18 +31,20 @@ class Question(models.Model):
     
     def toggle_upvote(self, user):
         if self.upvotes.filter(id=user.id).exists():
+            # Remove upvote
             self.upvotes.remove(user)
-            self.upvote_count = F('upvote_count') - 1
+            # decrement upvote_count atomically
+            Question.objects.filter(pk=self.pk).update(upvote_count=F('upvote_count') - 1)
             message = 'Upvote removed'
         else:
             if self.downvotes.filter(id=user.id).exists():
                 self.downvotes.remove(user)
-                self.downvote_count = F('downvote_count') - 1
+                Question.objects.filter(pk=self.pk).update(downvote_count=F('downvote_count') - 1)
             self.upvotes.add(user)
-            self.upvote_count = F('upvote_count') + 1
+            Question.objects.filter(pk=self.pk).update(upvote_count=F('upvote_count') + 1)
             message = 'Question upvoted'
 
-        self.save(update_fields=['upvote_count', 'downvote_count'])
+        # Refresh counts from DB after atomic update
         self.refresh_from_db(fields=['upvote_count', 'downvote_count'])
 
         return {
@@ -54,17 +56,16 @@ class Question(models.Model):
     def toggle_downvote(self, user):
         if self.downvotes.filter(id=user.id).exists():
             self.downvotes.remove(user)
-            self.downvote_count = F('downvote_count') - 1
+            Question.objects.filter(pk=self.pk).update(downvote_count=F('downvote_count') - 1)
             message = 'Downvote removed'
         else:
             if self.upvotes.filter(id=user.id).exists():
                 self.upvotes.remove(user)
-                self.upvote_count = F('upvote_count') - 1
+                Question.objects.filter(pk=self.pk).update(upvote_count=F('upvote_count') - 1)
             self.downvotes.add(user)
-            self.downvote_count = F('downvote_count') + 1
+            Question.objects.filter(pk=self.pk).update(downvote_count=F('downvote_count') + 1)
             message = 'Question downvoted'
 
-        self.save(update_fields=['upvote_count', 'downvote_count'])
         self.refresh_from_db(fields=['upvote_count', 'downvote_count'])
 
         return {
@@ -72,7 +73,7 @@ class Question(models.Model):
             "upvote_count": self.upvote_count,
             "downvote_count": self.downvote_count
         }
-    
+        
 class Answer(models.Model):
     image  =  models.ImageField(upload_to='answers/images/', blank=True, null=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE,related_name='answer')

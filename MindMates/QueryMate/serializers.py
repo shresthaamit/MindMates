@@ -76,7 +76,7 @@ class AnswerSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
     class Meta:
         model = Answer
-        fields = ['id', 'user', 'content','image', 'created_at', 'updated_at','review_answers','upvote_count','downvote_count']
+        fields = ['id', 'user', 'content','image','answerurl', 'created_at', 'updated_at','review_answers','upvote_count','downvote_count']
         read_only_fields = ['user', 'created_at', 'updated_at']
         
         
@@ -99,14 +99,16 @@ class QuestionSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
     is_owner = serializers.SerializerMethodField()
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    author_id = serializers.IntegerField(source='user.id', read_only=True) 
+    answer_count = serializers.IntegerField(source='answer.count', read_only=True) 
     class Meta:
         
         model = Question
         fields = [
-            'id', 'title', 'description', 'image', 'user', 'answer', 'user_email',
-            'created_at', 'updated_at', 'tags', 'tag_ids','upvote_count','downvote_count','is_owner'
+            'id', 'title', 'description', 'image', 'user', 'answer', 'user_email', 'author_id',
+            'created_at', 'updated_at', 'tags', 'tag_ids','upvote_count','downvote_count','is_owner','answer_count'
         ]
-        read_only_fields = ['user', 'created_at', 'updated_at','is_owner']
+        read_only_fields = ['user', 'created_at', 'updated_at','is_owner', 'answer_count']
     def get_is_owner(self, obj):
         request = self.context.get('request', None)
         if request and hasattr(request, "user"):
