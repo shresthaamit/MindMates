@@ -207,5 +207,5 @@ class ReviewViewset(viewsets.ModelViewSet):
         # Check if this user already reviewed this answer
         if Review.objects.filter(answer=answer, user=self.request.user).exists():
             raise ValidationError({"detail": "You have already reviewed this answer."})
-            print("AAAA")
+            # print("AAAA")
         serializer.save(answer=answer, user=self.request.user)
