@@ -53,6 +53,7 @@ def create_conversation(request):
 
     
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_conversation(request, convo_id):
     conversation = Conversation.objects.filter(id=convo_id)
     if not conversation.exists():

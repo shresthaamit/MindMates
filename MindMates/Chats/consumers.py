@@ -96,7 +96,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message.save()
             return conversation, message
         except Exception:
-            print(f"Error saving message: {e}")
+            print(f"Error saving message: ")
             return None, None
 
     @database_sync_to_async
