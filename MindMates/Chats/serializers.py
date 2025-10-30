@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 class MessageSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+    sender = UserSerializer(read_only=True)
     class Meta:
         model = Message
         fields = ['id', 'sender', 'content', 'file', 'file_url', 'created_at', 'is_read']
@@ -22,11 +23,12 @@ class ConversationListSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     class Meta:
         model = Conversation
-        fields = ['initiator', 'created_at', 'last_message']
+        fields = ['initiator', 'receiver','created_at', 'last_message']
 
-    def get_last_message(self,instance):
-        message =   instance.message_set.first()
-        return MessageSerializer(message).data
+    def get_last_message(self, instance):
+        message = instance.messages.order_by('-created_at').first()
+        return MessageSerializer(message).data if message else None
+
 
 
 class ConversationSerializer(serializers.ModelSerializer):

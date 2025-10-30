@@ -1,4 +1,4 @@
-from datetime import timezone
+from django.utils import timezone
 from django.shortcuts import render
 from .models import Conversation,Message
 from rest_framework import generics,permissions,status
@@ -14,8 +14,35 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from rest_framework.decorators import authentication_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.db import transaction
+from django.db import transaction,models
+from rest_framework import generics
+from .pagination import MessagePagination
 # Create your views here.
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def all_users_for_chat(request):
+    user = request.user
+    users = User.objects.exclude(id=user.id)  # Exclude self
+    result = []
+
+    for u in users:
+        # Check if conversation exists
+        convo = Conversation.objects.filter(
+            initiator=user, receiver=u
+        ).first() or Conversation.objects.filter(
+            initiator=u, receiver=user
+        ).first()
+
+        last_msg = convo.messages.order_by('-created_at').first() if convo else None
+
+        result.append({
+            "conversation_id": convo.id if convo else None,
+            "user_id": u.id,
+            "name": u.username,
+            "lastMessage": last_msg.content if last_msg else "Start chatting",
+            "time": last_msg.created_at.isoformat() if last_msg else "",
+        })
+    return Response(result)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_conversation(request):
@@ -116,9 +143,22 @@ def edit_message(request, message_id):
             sender=request.user,  # Only sender can edit
             is_deleted=False      # Can't edit deleted messages
         )
-        serializer = MessageSerializer(message, data=request.data, partial=True)
+        serializer = MessageSerializer(message, data=request.data, partial=True,  context={'request': request})
         if serializer.is_valid():
+            if 'file' in request.data and message.file:
+                message.file.delete(save=False)
             serializer.save(is_edited=True)
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{message.conversation.id}",
+                {
+                    "type": "message.edited",  # must match consumer method
+                    "message_id": message.id,
+                    "new_content": serializer.validated_data.get("content", message.content),
+                    "edited_at": timezone.now().isoformat(),
+                    "file_url": serializer.validated_data.get("file").url if serializer.validated_data.get("file") else None
+                }
+            )
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
     except Message.DoesNotExist:
@@ -132,8 +172,19 @@ def delete_message(request, message_id):
             id=message_id,
             sender=request.user  # Only sender can delete
         )
-        message.is_deleted = True
+        convo_id = message.conversation.id
+        message_id = message.id
+        if message.file:
+            message.file.delete(save=False)
         message.delete()
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{convo_id}",
+            {
+                "type": "message.deleted",
+                "message_id": message_id,
+            }
+        )
         return Response({"status": "message deleted"})
     except Message.DoesNotExist:
         return Response({"error": "Message not found"}, status=404)
@@ -276,3 +327,27 @@ def toggle_like(request, conversation_id, message_id):
             {"error": "Message not found in this conversation"},
             status=status.HTTP_404_NOT_FOUND
         )
+        
+class ConversationListView(generics.ListAPIView):
+    """List all conversations for the logged-in user"""
+    serializer_class = ConversationListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Conversation.objects.filter(
+            models.Q(initiator=user) | models.Q(receiver=user)
+        ).order_by('-updated_at')
+
+class MessageListView(generics.ListAPIView):
+    """Fetch message history for a conversation"""
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = MessagePagination 
+    def get_queryset(self):
+        convo_id = self.kwargs['pk']
+        user = self.request.user
+        convo = Conversation.objects.get(id=convo_id)
+        if user not in [convo.initiator, convo.receiver]:
+            return Message.objects.none()
+        return convo.messages.order_by('created_at')

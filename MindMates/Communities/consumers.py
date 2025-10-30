@@ -47,20 +47,26 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             if data.get('type') == 'chat_message':
                 await self.process_community_message(data)
             
-            if data.get('type') == 'file_share':
+            elif data.get('type') == 'file_share':
                 await self.process_file_share(data)
                 
-            if data.get('type') == 'edit_message':
+            elif data.get('type') == 'edit_message':
                 await self.handle_edit_message(data)
                 
-            if data.get('type') == 'delete_message':
+            elif data.get('type') == 'delete_message':
                 await self.handle_delete_message(data)
-            if data.get('type') == 'like_message':
-                await self.handle_like(
+            elif data.get('type') == 'like_message':
+                result = await self.handle_like(
                     community_id=data['community_id'],
                     message_id=data['message_id']
                 )
-                        
+                await self.broadcast_message({
+                    'type': 'like_update',
+                    'message_id': data['message_id'],
+                    'like_count': result['like_count'],
+                    'liked': result['liked'],
+                })
+                            
             else:
                 await self.send_error("Invalid message type", status=400)
                 
@@ -104,12 +110,23 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_recent_messages(self):
-        return list(CommunityMessage.objects.filter(
+        messages = CommunityMessage.objects.filter(
             community_id=self.community_id,
             is_deleted=False
-        ).order_by('-created_at')[:20].values(
-            'id', 'content', 'file', 'file_name', 'sender__username', 'created_at'
-        ))
+        ).order_by('-created_at')[:20]
+        
+        result = []
+        for msg in messages:
+            result.append({
+                'id': msg.id,
+                'content': msg.content,
+                'file': msg.file.url if msg.file else None,
+                'file_name': msg.file_name,
+                'sender__username': msg.sender.username,
+                'created_at': msg.created_at.isoformat()  # ✅ convert datetime
+            })
+        return result
+
     async def process_community_message(self, data):
         message_content = data.get('message', '').strip()
         if not message_content:
@@ -263,7 +280,7 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
 
     async def complete_connection(self):
         self.room_group_name = f'community_{self.community_id}'
-        
+        await self.send_recent_messages()
         if await self.verify_community_membership():
             await self.channel_layer.group_add(
                 self.room_group_name,
@@ -274,6 +291,11 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             await self.add_user_to_community_online_list()
             print(f"User {self.user.username} connected")
             print(f"User {self.user.username} connected to community {self.community_id}")
+            await self.broadcast_message({
+                'type': 'user_joined',
+                'user': await self.get_user_data(self.user)
+            })
+          
         else:
             await self.close(code=4003)
     @database_sync_to_async
@@ -287,13 +309,26 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             return community.members.filter(id=self.user.id).exists()
         except Community.DoesNotExist:
             return False
-
+    @database_sync_to_async
+    def remove_user_from_online_list(self):
+        try:
+            community = Community.objects.get(id=self.community_id)
+            community.online_members.remove(self.user)
+        except Community.DoesNotExist:
+            pass
     async def disconnect(self, close_code):
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(
                 self.room_group_name,
                 self.channel_name
             )
+            self.connected = False
+            self.authenticated = False
+            self.awaiting_auth = True
+            await self.broadcast_message({
+                'type': 'user_left',
+                'user': await self.get_user_data(self.user)
+            })
         print(f"User disconnected from community chat with code {close_code}")
         
     async def handle_edit_message(self, data):
@@ -305,7 +340,7 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'message.edited',
+                    'type': 'message_edited',
                     'message_id': data['message_id'],
                     'new_content': data['new_content'],
                     'edited_at': timezone.now().isoformat()
@@ -318,7 +353,7 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'message.deleted',
+                    'type': 'message_deleted',
                     'message_id': data['message_id']
                 }
             )
@@ -353,8 +388,31 @@ class CommunityChatConsumer(AsyncWebsocketConsumer):
             return False
     @database_sync_to_async
     def handle_like(self, community_id, message_id):
-        message = CommunityMessage.objects.get(
-            id=message_id,
-            community_id=community_id
-        )
-        
+        user = self.user
+        message = CommunityMessage.objects.get(id=message_id, community_id=community_id)
+
+        if user in message.likes.all():
+            message.likes.remove(user)
+            liked = False
+        else:
+            message.likes.add(user)
+            liked = True
+
+        message.update_like_count()
+        return {"liked": liked, "like_count": message.like_count}
+    async def message_edited(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_edited',
+            'message_id': event['message_id'],
+            'new_content': event['new_content'],
+            'edited_at': event['edited_at']
+        }))
+
+    async def message_deleted(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_deleted',
+            'message_id': event['message_id']
+        }))
+
+
+                

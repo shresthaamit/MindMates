@@ -5,7 +5,7 @@ class Conversation(models.Model):
     initiator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='convo_starter')
     receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='convo_participate')
     created_at = models.DateTimeField(auto_now_add=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
         return f"Conversation between {self.initiator} and {self.receiver}"
